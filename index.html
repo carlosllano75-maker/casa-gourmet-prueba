@@ -26,6 +26,7 @@
     button:active{opacity:0.7}
     .btn-danger{background:#ff4444 !important;color:#fff;padding:5px 10px}
     .btn-edit{background:#3498db !important;color:#fff;padding:5px 10px}
+    .btn-obs{background:#f39c12 !important;color:#fff;padding:5px 10px} /* Nuevo botón de notas */
     .lista{background:#111;padding:15px;border-radius:15px;margin:15px;border-left:4px solid #d4af37} 
     select, input{padding:12px;border-radius:10px;margin:8px 0;background:#222;color:#fff;border:1px solid #444;width:80%;max-width:300px}
     h3{color:#d4af37;margin-top:20px}
@@ -52,7 +53,7 @@
       <div id="t-items" style="text-align:left; font-size:20px; font-weight:bold;"></div>
       <div class="sep"></div>
       <b id="t-total" style="font-size:30px"></b><br><br>
-      <b style="font-size: 24px;">¡Gracias por su compra!</b>
+      <b style="font-size: 24px;">"Esperamos que tu comida haya sido tan buena como tu compañía."</b>
     </div>
     <div id="ticket-reporte" class="ticket-termico" style="display:none">
       <img src="logo-casa-gourmet.jpg" style="width: 120px;"><br>
@@ -89,6 +90,7 @@
  
   <script> 
     const CLAVE_MAESTRA = "GOURMET2024";
+    const DIAS_LICENCIA = 30; // Días que dura el acceso
  
     let menu=JSON.parse(localStorage.getItem("menu")||"[]"); 
     let pedidos=JSON.parse(localStorage.getItem("pedidos")||"{}"); 
@@ -108,16 +110,48 @@
  
     function validarLicencia() {
       if(document.getElementById("passInput").value === CLAVE_MAESTRA) {
+        // Al ingresar clave correcta, se calculan 30 días a futuro
+        let fechaVencimiento = new Date().getTime() + (DIAS_LICENCIA * 24 * 60 * 60 * 1000);
         localStorage.setItem("licencia_activa", "true");
+        localStorage.setItem("fecha_vencimiento", fechaVencimiento);
+        localStorage.removeItem("ultimo_recordatorio"); // Reseteamos avisos anteriores
         chequearAcceso();
       } else { alert("Clave incorrecta"); }
     }
  
     function chequearAcceso() {
-      if(localStorage.getItem("licencia_activa") === "true") {
+      let activa = localStorage.getItem("licencia_activa");
+      let vencimiento = parseInt(localStorage.getItem("fecha_vencimiento"));
+      let hoy = new Date().getTime();
+
+      if(activa === "true" && vencimiento && hoy < vencimiento) {
+        // Calcular cuántos días faltan
+        let diasRestantes = Math.ceil((vencimiento - hoy) / (1000 * 60 * 60 * 24));
+        
+        // Si faltan 5 días o menos, enviamos aviso diario
+        if (diasRestantes <= 5) {
+          let fechaHoyStr = new Date().toDateString();
+          let ultimoAviso = localStorage.getItem("ultimo_recordatorio");
+          
+          if (ultimoAviso !== fechaHoyStr) {
+            alert("⚠️ AVISO DE SISTEMA: Su licencia vence en " + diasRestantes + " día(s). Por favor renueve el sistema para no perder el acceso.");
+            localStorage.setItem("ultimo_recordatorio", fechaHoyStr);
+          }
+        }
+
         document.getElementById("bloqueo").style.display = "none";
         document.getElementById("contenido-app").style.display = "block";
         verMesas();
+      } else if (activa === "true" && vencimiento && hoy >= vencimiento) {
+        // La licencia ya caducó
+        localStorage.setItem("licencia_activa", "false");
+        document.getElementById("bloqueo").style.display = "flex";
+        document.getElementById("contenido-app").style.display = "none";
+        alert("Su licencia ha expirado. Por favor, introduzca una nueva clave de acceso para continuar facturando.");
+      } else {
+        // Estado por defecto (no ha ingresado clave)
+        document.getElementById("bloqueo").style.display = "flex";
+        document.getElementById("contenido-app").style.display = "none";
       }
     }
  
@@ -161,7 +195,7 @@
       });
       document.getElementById("app").innerHTML=html; 
     }
-
+ 
     function exportarMenu() {
         const dataStr = JSON.stringify({ menu, categorias, listaMesas });
         const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
@@ -170,7 +204,7 @@
         linkElement.setAttribute('download', 'respaldo_casa_gourmet.json');
         linkElement.click();
     }
-
+ 
     function importarMenu() {
         const input = document.createElement('input');
         input.type = 'file';
@@ -192,18 +226,18 @@
         }
         input.click();
     }
-
+ 
     function eliminarProducto(index) {
         if(confirm("¿Eliminar producto?")) { menu.splice(index, 1); guardar(); config(); }
     }
-
+ 
     function editarProducto(index) {
         let p = menu[index];
         let n = prompt("Nombre del producto:", p.nombre);
         let pr = prompt("Precio:", p.precio);
         if(n && pr) { menu[index].nombre = n; menu[index].precio = parseFloat(pr); guardar(); config(); }
     }
-
+ 
     function abrirMesa(m){ 
       let html=`<h3>Mesa ${m}</h3>`; 
       let cats = [...new Set(menu.map(p=>p.categoria))];
@@ -216,7 +250,7 @@
       html+=`<br><button onclick='verMesas()' style='background:#444; color:white; margin-top:10px'>⬅️ Volver</button>`; 
       document.getElementById("app").innerHTML=html; 
     } 
-
+ 
     function filtrarCategoria(m,cat){ document.getElementById('productos-container').innerHTML = mostrarProductos(m,cat); }
     function mostrarProductos(m,cat){ 
       let html="<div class='grid'>"; 
@@ -225,7 +259,7 @@
       }); 
       return html + "</div>"; 
     } 
-
+ 
     function agregar(m,n,pr){ 
       if(!pedidos[m]) pedidos[m]=[]; 
       let existente = pedidos[m].find(p => p.nombre === n);
@@ -233,7 +267,18 @@
       else { pedidos[m].push({nombre:n, precio:pr, cantidad:1}); }
       guardar(); abrirMesa(m); 
     }
-
+ 
+    /* NUEVA FUNCIÓN PARA AGREGAR LA OBSERVACIÓN */
+    function agregarObservacion(m, i) {
+      let obsActual = pedidos[m][i].observacion || "";
+      let nuevaObs = prompt("Observación (Ej: Sin cebolla):", obsActual);
+      if (nuevaObs !== null) {
+        pedidos[m][i].observacion = nuevaObs;
+        guardar();
+        abrirMesa(m);
+      }
+    }
+ 
     function mostrarLista(m){ 
       let html="<div class='lista'><b>📝 Pedido:</b><br>"; let total=0; 
       if(pedidos[m]){ 
@@ -241,18 +286,28 @@
           let cant = p.cantidad || 1;
           let subtotal = p.precio * cant;
           total += subtotal; 
-          html+=`<div class='item-pedido'><span>${cant}x ${p.nombre}</span> <span>$${subtotal} <button class='btn-danger' onclick='eliminarItem("${m}",${i})'>x</button></span></div>`; 
+          let txtObs = p.observacion ? `<br><span style="color:#f39c12;font-size:16px;font-weight:bold;">Nota: ${p.observacion}</span>` : "";
+          
+          /* Modificado para incluir el texto de la observación y el botón naranja (btn-obs) */
+          html+=`<div class='item-pedido'>
+                    <div style="text-align:left">${cant}x ${p.nombre}${txtObs}</div> 
+                    <div>
+                      $${subtotal} 
+                      <button class='btn-obs' onclick='agregarObservacion("${m}",${i})'>📝</button> 
+                      <button class='btn-danger' onclick='eliminarItem("${m}",${i})'>x</button>
+                    </div>
+                 </div>`; 
         }); 
       } 
       return html + `<br><b>TOTAL: $${total}</b></div>`; 
     }
-
+ 
     function eliminarItem(m,i){ 
       if(pedidos[m][i].cantidad > 1){ pedidos[m][i].cantidad--; }
       else { pedidos[m].splice(i,1); }
       guardar(); abrirMesa(m); 
     }
-
+ 
     function pagarMesa(m){
       if(!pedidos[m] || pedidos[m].length === 0) return;
       if(confirm("¿Cobrar e imprimir ticket?")){
@@ -261,9 +316,17 @@
           let cant = p.cantidad || 1;
           let subtotal = p.precio * cant;
           totalMesa += subtotal;
+          
+          /* Modificado para que la observación salga en el ticket de pago */
           itemsHTML += `<div style="display:flex; justify-content:space-between"><span>${cant}x ${p.nombre}</span><span>$${subtotal}</span></div>`;
-          textoDetalles += cant + "x " + p.nombre + ", ";
+          if (p.observacion) {
+            itemsHTML += `<div style="text-align:left; font-size:18px; font-weight:bold; margin-top:-5px; margin-bottom:5px;">* Obs: ${p.observacion}</div>`;
+            textoDetalles += cant + "x " + p.nombre + " (*" + p.observacion + "), ";
+          } else {
+            textoDetalles += cant + "x " + p.nombre + ", ";
+          }
         });
+        
         historialVentas.push({ hora: new Date().toLocaleTimeString(), mesa: m, total: totalMesa, detalles: textoDetalles.slice(0, -2) });
         
         document.getElementById("t-fecha").innerText = new Date().toLocaleString();
@@ -275,7 +338,7 @@
         document.getElementById("ticket-visual").style.display = "block";
         document.getElementById("ticket-reporte").style.display = "none";
         wrapper.style.display = "flex";
-
+ 
         if (typeof html2canvas !== 'undefined') {
             html2canvas(document.getElementById("ticket-visual"), { scale: 2 }).then(canvas => {
                 let link = document.createElement('a');
@@ -292,7 +355,7 @@
         }
       }
     }
-
+ 
     function imprimirReporte() {
       if(historialVentas.length === 0) return alert("Sin ventas.");
       let itemsHTML = "";
@@ -305,12 +368,12 @@
       document.getElementById("r-items").innerHTML = itemsHTML;
       document.getElementById("r-total").innerText = "TOTAL DÍA: $" + ventasDia;
       document.getElementById("r-cantidad").innerText = "Ventas: " + historialVentas.length;
-
+ 
       const wrapper = document.getElementById("ticket-wrapper");
       document.getElementById("ticket-visual").style.display = "none";
       document.getElementById("ticket-reporte").style.display = "block";
       wrapper.style.display = "flex";
-
+ 
       if (typeof html2canvas !== 'undefined') {
           setTimeout(() => {
             html2canvas(document.getElementById("ticket-reporte"), {scale: 2}).then(canvas => {
@@ -326,7 +389,7 @@
           alert("Librería de impresión no disponible.");
       }
     }
-
+ 
     function configCategorias(){
       let html="<h3>Categorías</h3><button onclick='nuevaCategoria()'>+ Nueva</button>";
       categorias.forEach((c,i)=>{ html+=`<div class='card'>${c} <button class='btn-danger' onclick='eliminarCategoria(${i})'>🗑️</button></div>`; });
@@ -370,19 +433,21 @@
       pedidos[m].forEach(p => { 
         let cant = p.cantidad || 1;
         let subtotal = p.precio * cant;
-        texto += "- " + cant + "x " + p.nombre + ": $" + subtotal + "\n"; 
+        /* Modificado para incluir observación en WhatsApp */
+        let obsTexto = p.observacion ? " (*" + p.observacion + "*)" : "";
+        texto += "- " + cant + "x " + p.nombre + obsTexto + ": $" + subtotal + "\n"; 
         total += subtotal; 
       });
       texto += "\n*TOTAL: $" + total + "*";
       window.open("https://api.whatsapp.com/send?text=" + encodeURIComponent(texto), '_blank');
     }
-
+ 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').then(reg => console.log('Offline OK')).catch(err => console.log('Offline Error'));
       });
     }
-
+ 
     chequearAcceso();
   </script> 
 </body> 
