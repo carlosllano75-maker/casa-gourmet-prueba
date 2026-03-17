@@ -13,7 +13,7 @@
   <link rel="apple-touch-icon" href="logo-casa-gourmet.jpg">
   <link rel="manifest" href="manifest.json">
  
-  <script src="html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
  
   <style> 
     body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#0b0b0b;color:#fff;margin:0;padding-bottom:50px;user-select:none;} 
@@ -26,7 +26,7 @@
     button:active{opacity:0.7}
     .btn-danger{background:#ff4444 !important;color:#fff;padding:5px 10px}
     .btn-edit{background:#3498db !important;color:#fff;padding:5px 10px}
-    .btn-obs{background:#f39c12 !important;color:#fff;padding:5px 10px} /* Nuevo botón de notas */
+    .btn-obs{background:#f39c12 !important;color:#fff;padding:5px 10px}
     .lista{background:#111;padding:15px;border-radius:15px;margin:15px;border-left:4px solid #d4af37} 
     select, input{padding:12px;border-radius:10px;margin:8px 0;background:#222;color:#fff;border:1px solid #444;width:80%;max-width:300px}
     h3{color:#d4af37;margin-top:20px}
@@ -34,8 +34,9 @@
     .item-pedido{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;border-bottom:1px dashed #333;padding-bottom:5px}
     .backup-box{background:#222; padding:15px; border-radius:15px; margin:15px auto; max-width:400px; border:1px dashed #444}
     
-    #ticket-wrapper { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 10000; display: none; justify-content: center; align-items: center; }
-    .ticket-termico { width: 240px; background: white; color: black; padding: 20px; font-family: 'Courier New', Courier, monospace; text-align: center; }
+    /* Área del ticket (oculta en pantalla, solo para procesamiento) */
+    #ticket-wrapper { position: fixed; top: 0; left: -5000px; width: 300px; z-index: 10000; }
+    .ticket-termico { width: 280px; background: white; color: black; padding: 15px; font-family: 'Courier New', Courier, monospace; text-align: center; }
     .sep { border-top: 1px dashed #000; margin: 10px 0; }
  
     #bloqueo { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0b0b0b; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
@@ -45,7 +46,7 @@
  
   <div id="ticket-wrapper">
     <div id="ticket-visual" class="ticket-termico">
-      <img src="logo-casa-gourmet.jpg" style="width: 220px; margin-bottom: 15px;"><br>
+      <img src="logo-casa-gourmet.jpg" style="width: 220px; margin-bottom: 10px;"><br>
       <b style="font-size: 24px;">CASA GOURMET</b><br>
       <b id="t-mesa" style="font-size:26px;"></b><br>
       <span id="t-fecha" style="font-size:18px; font-weight:bold;"></span><br>
@@ -53,7 +54,7 @@
       <div id="t-items" style="text-align:left; font-size:20px; font-weight:bold;"></div>
       <div class="sep"></div>
       <b id="t-total" style="font-size:30px"></b><br><br>
-      <b style="font-size: 24px;">"Esperamos que tu comida haya sido tan buena como tu compañía."</b>
+      <b style="font-size: 20px;">"Esperamos que tu comida haya sido tan buena como tu compañía."</b>
     </div>
     <div id="ticket-reporte" class="ticket-termico" style="display:none">
       <img src="logo-casa-gourmet.jpg" style="width: 120px;"><br>
@@ -90,7 +91,7 @@
  
   <script> 
     const CLAVE_MAESTRA = "GOURMET2024";
-    const DIAS_LICENCIA = 3; // Días que dura el acceso
+    const DIAS_LICENCIA = 3; 
  
     let menu=JSON.parse(localStorage.getItem("menu")||"[]"); 
     let pedidos=JSON.parse(localStorage.getItem("pedidos")||"{}"); 
@@ -107,14 +108,35 @@
       localStorage.setItem("listaMesas",JSON.stringify(listaMesas));
       localStorage.setItem("historialVentas",JSON.stringify(historialVentas));
     }
+
+    // --- NUEVA FUNCIÓN PARA IMPRIMIR DIRECTAMENTE ---
+    function imprimirConSelector(idElemento) {
+      const target = document.getElementById(idElemento);
+      target.style.display = "block"; // Asegurar que sea visible para la captura
+
+      html2canvas(target, { scale: 3 }).then(canvas => {
+        const imgData = canvas.toDataURL("image/png");
+        const ventanaPrint = window.open('', '_blank');
+        ventanaPrint.document.write(`
+          <html>
+            <head><title>Imprimir Casa Gourmet</title></head>
+            <body style="margin:0; display:flex; justify-content:center;">
+              <img src="${imgData}" style="width:100%; max-width:300px;">
+              <script>
+                window.onload = function() { window.print(); setTimeout(() => { window.close(); }, 500); }
+              <\/script>
+            </body>
+          </html>
+        `);
+        ventanaPrint.document.close();
+      });
+    }
  
     function validarLicencia() {
       if(document.getElementById("passInput").value === CLAVE_MAESTRA) {
-        // Al ingresar clave correcta, se calculan 30 días a futuro
         let fechaVencimiento = new Date().getTime() + (DIAS_LICENCIA * 24 * 60 * 60 * 1000);
         localStorage.setItem("licencia_activa", "true");
         localStorage.setItem("fecha_vencimiento", fechaVencimiento);
-        localStorage.removeItem("ultimo_recordatorio"); // Reseteamos avisos anteriores
         chequearAcceso();
       } else { alert("Clave incorrecta"); }
     }
@@ -123,35 +145,12 @@
       let activa = localStorage.getItem("licencia_activa");
       let vencimiento = parseInt(localStorage.getItem("fecha_vencimiento"));
       let hoy = new Date().getTime();
-
       if(activa === "true" && vencimiento && hoy < vencimiento) {
-        // Calcular cuántos días faltan
-        let diasRestantes = Math.ceil((vencimiento - hoy) / (1000 * 60 * 60 * 24));
-        
-        // Si faltan 5 días o menos, enviamos aviso diario
-        if (diasRestantes <= 5) {
-          let fechaHoyStr = new Date().toDateString();
-          let ultimoAviso = localStorage.getItem("ultimo_recordatorio");
-          
-          if (ultimoAviso !== fechaHoyStr) {
-            alert("⚠️ AVISO DE SISTEMA: Su licencia vence en " + diasRestantes + " día(s). Por favor renueve el sistema para no perder el acceso.");
-            localStorage.setItem("ultimo_recordatorio", fechaHoyStr);
-          }
-        }
-
         document.getElementById("bloqueo").style.display = "none";
         document.getElementById("contenido-app").style.display = "block";
         verMesas();
-      } else if (activa === "true" && vencimiento && hoy >= vencimiento) {
-        // La licencia ya caducó
-        localStorage.setItem("licencia_activa", "false");
-        document.getElementById("bloqueo").style.display = "flex";
-        document.getElementById("contenido-app").style.display = "none";
-        alert("Su licencia ha expirado. Por favor, introduzca una nueva clave de acceso para continuar facturando.");
       } else {
-        // Estado por defecto (no ha ingresado clave)
         document.getElementById("bloqueo").style.display = "flex";
-        document.getElementById("contenido-app").style.display = "none";
       }
     }
  
@@ -177,65 +176,9 @@
         <br><button onclick="reiniciarCaja()" style="background:#222; color:#ff4444; font-size:11px; margin-top:10px">Limpiar Todo</button>
       </div>`;
       html+="<button onclick='verHistorial()'>🕒 Ver Historial</button>";
-      html+="<br><button onclick='nuevoProducto()'>+ Nuevo Producto</button>";
-      html+=" <button onclick='configCategorias()'>📂 Categorías</button>";
-      html+=" <button onclick='configMesas()'>🍽️ Editar Mesas</button>";
+      html+="<br><button onclick='nuevoProducto()'>+ Nuevo Producto</button> <button onclick='configCategorias()'>📂 Categorías</button>";
       html += `<div class="backup-box"><button onclick="exportarMenu()">📤 Exportar</button> <button onclick="importarMenu()">📥 Importar</button></div>`;
-      
-      html+="<hr style='border:1px solid #333; margin:20px'><h3>📦 Gestionar Productos</h3>";
-      if(menu.length === 0) html+="<p>No hay productos guardados.</p>";
-      menu.forEach((p, index) => {
-        html += `<div class='card' style='margin:10px auto; max-width:400px; display:flex; justify-content:space-between; align-items:center'>
-          <div style='text-align:left'><b>${p.nombre}</b><br><small>$${p.precio} (${p.categoria})</small></div>
-          <div>
-            <button class='btn-edit' onclick='editarProducto(${index})'>✏️</button>
-            <button class='btn-danger' onclick='eliminarProducto(${index})'>🗑️</button>
-          </div>
-        </div>`;
-      });
       document.getElementById("app").innerHTML=html; 
-    }
- 
-    function exportarMenu() {
-        const dataStr = JSON.stringify({ menu, categorias, listaMesas });
-        const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-        const linkElement = document.createElement('a');
-        linkElement.setAttribute('href', dataUri);
-        linkElement.setAttribute('download', 'respaldo_casa_gourmet.json');
-        linkElement.click();
-    }
- 
-    function importarMenu() {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.json';
-        input.onchange = e => {
-            const reader = new FileReader();
-            reader.onload = ev => {
-                try {
-                    const content = JSON.parse(ev.target.result);
-                    if(content.menu) {
-                        menu = content.menu;
-                        categorias = content.categorias;
-                        if(content.listaMesas) listaMesas = content.listaMesas;
-                        guardar(); config(); alert("✅ Importado");
-                    }
-                } catch(err) { alert("Error al importar"); }
-            };
-            reader.readAsText(e.target.files[0]);
-        }
-        input.click();
-    }
- 
-    function eliminarProducto(index) {
-        if(confirm("¿Eliminar producto?")) { menu.splice(index, 1); guardar(); config(); }
-    }
- 
-    function editarProducto(index) {
-        let p = menu[index];
-        let n = prompt("Nombre del producto:", p.nombre);
-        let pr = prompt("Precio:", p.precio);
-        if(n && pr) { menu[index].nombre = n; menu[index].precio = parseFloat(pr); guardar(); config(); }
     }
  
     function abrirMesa(m){ 
@@ -246,7 +189,7 @@
       html+="</select><div id='productos-container'>"+mostrarProductos(m,"")+"</div>"; 
       html+=mostrarLista(m); 
       html+=`<br><button onclick='enviarWhatsApp("${m}")' style='background:#25D366; color:white; width:90%'>📱 WhatsApp</button>`;
-      html+=`<br><button onclick='pagarMesa("${m}")' style='background:#28a745; color:white; width:90%; margin-top:10px'>💰 Cobrar</button>`;
+      html+=`<br><button onclick='pagarMesa("${m}")' style='background:#28a745; color:white; width:90%; margin-top:10px'>💰 Cobrar e Imprimir</button>`;
       html+=`<br><button onclick='verMesas()' style='background:#444; color:white; margin-top:10px'>⬅️ Volver</button>`; 
       document.getElementById("app").innerHTML=html; 
     } 
@@ -268,34 +211,20 @@
       guardar(); abrirMesa(m); 
     }
  
-    /* NUEVA FUNCIÓN PARA AGREGAR LA OBSERVACIÓN */
     function agregarObservacion(m, i) {
-      let obsActual = pedidos[m][i].observacion || "";
-      let nuevaObs = prompt("Observación (Ej: Sin cebolla):", obsActual);
-      if (nuevaObs !== null) {
-        pedidos[m][i].observacion = nuevaObs;
-        guardar();
-        abrirMesa(m);
-      }
+      let nuevaObs = prompt("Observación:", pedidos[m][i].observacion || "");
+      if (nuevaObs !== null) { pedidos[m][i].observacion = nuevaObs; guardar(); abrirMesa(m); }
     }
  
     function mostrarLista(m){ 
       let html="<div class='lista'><b>📝 Pedido:</b><br>"; let total=0; 
       if(pedidos[m]){ 
         pedidos[m].forEach((p,i)=>{ 
-          let cant = p.cantidad || 1;
-          let subtotal = p.precio * cant;
-          total += subtotal; 
+          let cant = p.cantidad || 1; let subtotal = p.precio * cant; total += subtotal; 
           let txtObs = p.observacion ? `<br><span style="color:#f39c12;font-size:16px;font-weight:bold;">Nota: ${p.observacion}</span>` : "";
-          
-          /* Modificado para incluir el texto de la observación y el botón naranja (btn-obs) */
           html+=`<div class='item-pedido'>
                     <div style="text-align:left">${cant}x ${p.nombre}${txtObs}</div> 
-                    <div>
-                      $${subtotal} 
-                      <button class='btn-obs' onclick='agregarObservacion("${m}",${i})'>📝</button> 
-                      <button class='btn-danger' onclick='eliminarItem("${m}",${i})'>x</button>
-                    </div>
+                    <div>$${subtotal} <button class='btn-obs' onclick='agregarObservacion("${m}",${i})'>📝</button> <button class='btn-danger' onclick='eliminarItem("${m}",${i})'>x</button></div>
                  </div>`; 
         }); 
       } 
@@ -303,8 +232,8 @@
     }
  
     function eliminarItem(m,i){ 
-      if(pedidos[m][i].cantidad > 1){ pedidos[m][i].cantidad--; }
-      else { pedidos[m].splice(i,1); }
+      if(pedidos[m][i].cantidad > 1) pedidos[m][i].cantidad--; 
+      else pedidos[m].splice(i,1); 
       guardar(); abrirMesa(m); 
     }
  
@@ -313,18 +242,10 @@
       if(confirm("¿Cobrar e imprimir ticket?")){
         let totalMesa = 0, itemsHTML = "", textoDetalles = "";
         pedidos[m].forEach(p => {
-          let cant = p.cantidad || 1;
-          let subtotal = p.precio * cant;
-          totalMesa += subtotal;
-          
-          /* Modificado para que la observación salga en el ticket de pago */
+          let cant = p.cantidad || 1; let subtotal = p.precio * cant; totalMesa += subtotal;
           itemsHTML += `<div style="display:flex; justify-content:space-between"><span>${cant}x ${p.nombre}</span><span>$${subtotal}</span></div>`;
-          if (p.observacion) {
-            itemsHTML += `<div style="text-align:left; font-size:18px; font-weight:bold; margin-top:-5px; margin-bottom:5px;">* Obs: ${p.observacion}</div>`;
-            textoDetalles += cant + "x " + p.nombre + " (*" + p.observacion + "), ";
-          } else {
-            textoDetalles += cant + "x " + p.nombre + ", ";
-          }
+          if (p.observacion) itemsHTML += `<div style="text-align:left; font-size:18px; font-weight:bold; margin-top:-5px; margin-bottom:5px;">* Obs: ${p.observacion}</div>`;
+          textoDetalles += `${cant}x ${p.nombre}${p.observacion ? '(*'+p.observacion+')' : ''}, `;
         });
         
         historialVentas.push({ hora: new Date().toLocaleTimeString(), mesa: m, total: totalMesa, detalles: textoDetalles.slice(0, -2) });
@@ -334,25 +255,13 @@
         document.getElementById("t-items").innerHTML = itemsHTML;
         document.getElementById("t-total").innerText = "TOTAL: $" + totalMesa;
         
-        const wrapper = document.getElementById("ticket-wrapper");
-        document.getElementById("ticket-visual").style.display = "block";
-        document.getElementById("ticket-reporte").style.display = "none";
-        wrapper.style.display = "flex";
- 
-        if (typeof html2canvas !== 'undefined') {
-            html2canvas(document.getElementById("ticket-visual"), { scale: 2 }).then(canvas => {
-                let link = document.createElement('a');
-                link.download = 'Ticket-' + m + '.png';
-                link.href = canvas.toDataURL("image/png");
-                link.click();
-                wrapper.style.display = "none";
-                ventasDia += totalMesa;
-                delete pedidos[m];
-                guardar(); verMesas();
-            }).catch(() => { wrapper.style.display = "none"; ventasDia += totalMesa; delete pedidos[m]; guardar(); verMesas(); });
-        } else {
-            wrapper.style.display = "none"; ventasDia += totalMesa; delete pedidos[m]; guardar(); verMesas();
-        }
+        // Disparar impresión nativa del sistema
+        imprimirConSelector("ticket-visual");
+
+        ventasDia += totalMesa;
+        delete pedidos[m];
+        guardar(); 
+        setTimeout(verMesas, 1000);
       }
     }
  
@@ -360,34 +269,18 @@
       if(historialVentas.length === 0) return alert("Sin ventas.");
       let itemsHTML = "";
       historialVentas.forEach(v => {
-        itemsHTML += `<div style="font-size:16px; border-bottom:1px solid #ddd; padding:5px 0">
-          <b>${v.hora} - Mesa ${v.mesa}</b><br>${v.detalles}<br><b>$${v.total}</b>
-        </div>`;
+        itemsHTML += `<div style="font-size:16px; border-bottom:1px solid #ddd; padding:5px 0"><b>${v.hora} - Mesa ${v.mesa}</b><br>${v.detalles}<br><b>$${v.total}</b></div>`;
       });
       document.getElementById("r-fecha").innerText = new Date().toLocaleString();
       document.getElementById("r-items").innerHTML = itemsHTML;
       document.getElementById("r-total").innerText = "TOTAL DÍA: $" + ventasDia;
       document.getElementById("r-cantidad").innerText = "Ventas: " + historialVentas.length;
  
-      const wrapper = document.getElementById("ticket-wrapper");
       document.getElementById("ticket-visual").style.display = "none";
       document.getElementById("ticket-reporte").style.display = "block";
-      wrapper.style.display = "flex";
- 
-      if (typeof html2canvas !== 'undefined') {
-          setTimeout(() => {
-            html2canvas(document.getElementById("ticket-reporte"), {scale: 2}).then(canvas => {
-              let link = document.createElement('a');
-              link.download = 'CIERRE-' + new Date().toLocaleDateString() + '.png';
-              link.href = canvas.toDataURL("image/png");
-              link.click();
-              wrapper.style.display = "none";
-            });
-          }, 500);
-      } else {
-          wrapper.style.display = "none";
-          alert("Librería de impresión no disponible.");
-      }
+      
+      imprimirConSelector("ticket-reporte");
+      setTimeout(() => { document.getElementById("ticket-reporte").style.display = "none"; }, 1500);
     }
  
     function configCategorias(){
@@ -398,13 +291,6 @@
     }
     function nuevaCategoria(){ let c=prompt("Nombre"); if(c && !categorias.includes(c)){ categorias.push(c); guardar(); configCategorias(); } }
     function eliminarCategoria(i){ if(confirm("¿Eliminar?")){ menu=menu.filter(p=>p.categoria!==categorias[i]); categorias.splice(i,1); guardar(); configCategorias(); } }
-    function configMesas() {
-      let html="<h3>Editar Mesas</h3>";
-      listaMesas.forEach((m, i) => { html += `<div class='card' style='margin:10px auto; max-width:300px; display:flex; justify-content:space-between; align-items:center'><span>Mesa ${m}</span><button class='btn-danger' onclick='eliminarMesa(${i})'>🗑️</button></div>`; });
-      html += "<br><button onclick='config()'>Volver</button>";
-      document.getElementById("app").innerHTML = html;
-    }
-    function eliminarMesa(i) { if(confirm("¿Eliminar?")) { listaMesas.splice(i, 1); guardar(); configMesas(); } }
     function agregarNuevaMesa() { let n = prompt("Nombre:"); if(n && !listaMesas.includes(n)) { listaMesas.push(n); guardar(); verMesas(); } }
     function nuevoProducto(){ 
       let html="<h3>Nuevo Producto</h3><input id='prodNombre' placeholder='Nombre'><br><input id='prodPrecio' type='number' placeholder='Precio'><br><select id='prodCategoria'>";
@@ -414,7 +300,7 @@
     }
     function guardarNuevoProducto(){
       let n=document.getElementById("prodNombre").value, pr=document.getElementById("prodPrecio").value, c=document.getElementById("prodCategoria")?.value;
-      if(n && pr && c){ menu.push({nombre:n,precio:parseFloat(pr),categoria:c, cantidad:1}); guardar(); config(); }
+      if(n && pr && c){ menu.push({nombre:n,precio:parseFloat(pr),categoria:c}); guardar(); config(); }
     }
     function reiniciarCaja(){ if(confirm("¿Limpiar historial?")){ ventasDia = 0; historialVentas = []; guardar(); config(); } }
     function verHistorial() {
@@ -431,21 +317,36 @@
       let texto = "*CASA GOURMET*\n*Mesa " + m + "*\n\n";
       let total = 0;
       pedidos[m].forEach(p => { 
-        let cant = p.cantidad || 1;
-        let subtotal = p.precio * cant;
-        /* Modificado para incluir observación en WhatsApp */
-        let obsTexto = p.observacion ? " (*" + p.observacion + "*)" : "";
-        texto += "- " + cant + "x " + p.nombre + obsTexto + ": $" + subtotal + "\n"; 
-        total += subtotal; 
+        let cant = p.cantidad || 1; let subtotal = p.precio * cant; total += subtotal;
+        texto += "- " + cant + "x " + p.nombre + (p.observacion ? " (*" + p.observacion + "*)" : "") + ": $" + subtotal + "\n"; 
       });
       texto += "\n*TOTAL: $" + total + "*";
       window.open("https://api.whatsapp.com/send?text=" + encodeURIComponent(texto), '_blank');
     }
- 
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').then(reg => console.log('Offline OK')).catch(err => console.log('Offline Error'));
-      });
+
+    function exportarMenu() {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({menu, categorias, listaMesas}));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", "respaldo_casa_gourmet.json");
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    }
+
+    function importarMenu() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.onchange = e => {
+            const reader = new FileReader();
+            reader.onload = ev => {
+                const content = JSON.parse(ev.target.result);
+                menu = content.menu; categorias = content.categorias; if(content.listaMesas) listaMesas = content.listaMesas;
+                guardar(); alert("✅ Sistema cargado"); location.reload();
+            };
+            reader.readAsText(e.target.files[0]);
+        }
+        input.click();
     }
  
     chequearAcceso();
