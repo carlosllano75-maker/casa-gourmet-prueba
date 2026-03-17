@@ -34,19 +34,30 @@
     .item-pedido{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;border-bottom:1px dashed #333;padding-bottom:5px}
     .backup-box{background:#222; padding:15px; border-radius:15px; margin:15px auto; max-width:400px; border:1px dashed #444}
     
-    /* Área del ticket (oculta en pantalla, solo para procesamiento) */
-    #ticket-wrapper { position: fixed; top: 0; left: -5000px; width: 300px; z-index: 10000; }
-    .ticket-termico { width: 280px; background: white; color: black; padding: 15px; font-family: 'Courier New', Courier, monospace; text-align: center; }
+    /* Configuración de Tickets Visuales */
+    #ticket-wrapper { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 10000; display: none; justify-content: center; align-items: center; }
+    .ticket-termico { width: 260px; background: white; color: black; padding: 20px; font-family: 'Courier New', Courier, monospace; text-align: center; }
     .sep { border-top: 1px dashed #000; margin: 10px 0; }
  
+    /* ESTILOS DE IMPRESIÓN DEL SISTEMA */
+    #zona-impresion { display: none; }
+    @media print {
+      body * { visibility: hidden; }
+      #zona-impresion, #zona-impresion * { visibility: visible; display: block !important; }
+      #zona-impresion { position: absolute; left: 0; top: 0; width: 100%; text-align: center; }
+      #zona-impresion img { width: 100%; max-width: 300px; }
+    }
+
     #bloqueo { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0b0b0b; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
   </style> 
 </head> 
 <body> 
  
+  <div id="zona-impresion"></div>
+
   <div id="ticket-wrapper">
     <div id="ticket-visual" class="ticket-termico">
-      <img src="logo-casa-gourmet.jpg" style="width: 220px; margin-bottom: 10px;"><br>
+      <img src="logo-casa-gourmet.jpg" style="width: 220px; margin-bottom: 15px;"><br>
       <b style="font-size: 24px;">CASA GOURMET</b><br>
       <b id="t-mesa" style="font-size:26px;"></b><br>
       <span id="t-fecha" style="font-size:18px; font-weight:bold;"></span><br>
@@ -54,7 +65,7 @@
       <div id="t-items" style="text-align:left; font-size:20px; font-weight:bold;"></div>
       <div class="sep"></div>
       <b id="t-total" style="font-size:30px"></b><br><br>
-      <b style="font-size: 20px;">"Esperamos que tu comida haya sido tan buena como tu compañía."</b>
+      <b style="font-size: 24px;">"Esperamos que tu comida haya sido tan buena como tu compañía."</b>
     </div>
     <div id="ticket-reporte" class="ticket-termico" style="display:none">
       <img src="logo-casa-gourmet.jpg" style="width: 120px;"><br>
@@ -100,6 +111,8 @@
     let listaMesas=JSON.parse(localStorage.getItem("listaMesas")||"[1,2,3,4,5,6,7,8,9,10,11,12]");
     let historialVentas=JSON.parse(localStorage.getItem("historialVentas")||"[]");
  
+    let printCharacteristic = null;
+
     function guardar(){
       localStorage.setItem("menu",JSON.stringify(menu));
       localStorage.setItem("pedidos",JSON.stringify(pedidos));
@@ -109,27 +122,35 @@
       localStorage.setItem("historialVentas",JSON.stringify(historialVentas));
     }
 
-    // --- NUEVA FUNCIÓN PARA IMPRIMIR DIRECTAMENTE ---
-    function imprimirConSelector(idElemento) {
-      const target = document.getElementById(idElemento);
-      target.style.display = "block"; // Asegurar que sea visible para la captura
+    async function conectarBluetooth() {
+      try {
+        const device = await navigator.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb', 'e7810a71-73ae-499d-8c15-faa9aef0c3f2', '0000fee7-0000-1000-8000-00805f9b34fb']
+        });
+        const server = await device.gatt.connect();
+        const services = await server.getPrimaryServices();
+        let service = services.find(s => s.uuid.startsWith('000018f0') || s.uuid.startsWith('e7810a71') || s.uuid.startsWith('0000fee7')) || services[0];
+        const characteristics = await service.getCharacteristics();
+        printCharacteristic = characteristics.find(c => c.properties.write || c.properties.writeWithoutResponse);
+        alert("✅ Impresora conectada: " + device.name);
+      } catch (error) {
+        alert("❌ Error: " + error.message);
+      }
+    }
 
-      html2canvas(target, { scale: 3 }).then(canvas => {
-        const imgData = canvas.toDataURL("image/png");
-        const ventanaPrint = window.open('', '_blank');
-        ventanaPrint.document.write(`
-          <html>
-            <head><title>Imprimir Casa Gourmet</title></head>
-            <body style="margin:0; display:flex; justify-content:center;">
-              <img src="${imgData}" style="width:100%; max-width:300px;">
-              <script>
-                window.onload = function() { window.print(); setTimeout(() => { window.close(); }, 500); }
-              <\/script>
-            </body>
-          </html>
-        `);
-        ventanaPrint.document.close();
-      });
+    async function enviarTextoImpresora(texto) {
+      if (!printCharacteristic) return;
+      try {
+        let textoLimpio = texto.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); 
+        let encoder = new TextEncoder();
+        let textArray = encoder.encode(textoLimpio + "\n\n\n\n"); 
+        let CHUNK_SIZE = 20;
+        for (let i = 0; i < textArray.length; i += CHUNK_SIZE) {
+          await printCharacteristic.writeValue(textArray.slice(i, i + CHUNK_SIZE));
+          await new Promise(resolve => setTimeout(resolve, 20));
+        }
+      } catch (e) { console.error(e); }
     }
  
     function validarLicencia() {
@@ -169,6 +190,11 @@
  
     function config(){ 
       let html="<h3>Ajustes de Sistema</h3>";
+      let estadoBT = printCharacteristic ? "🟢 Conectada" : "🔴 Desconectada";
+      html+=`<div class="backup-box" style="border-color:#3498db">
+        <small style="color:#3498db">IMPRESORA BLUETOOTH (${estadoBT})</small><br>
+        <button onclick="conectarBluetooth()" style="background:#3498db; color:white; margin-top:10px">🖨️ Conectar Impresora</button>
+      </div>`;
       html+=`<div class="backup-box" style="border-color:#d4af37">
         <small style="color:#d4af37">VENTAS ACUMULADAS</small><br>
         <b style="font-size:24px">$${ventasDia}</b><br>
@@ -193,7 +219,7 @@
       html+=`<br><button onclick='verMesas()' style='background:#444; color:white; margin-top:10px'>⬅️ Volver</button>`; 
       document.getElementById("app").innerHTML=html; 
     } 
- 
+
     function filtrarCategoria(m,cat){ document.getElementById('productos-container').innerHTML = mostrarProductos(m,cat); }
     function mostrarProductos(m,cat){ 
       let html="<div class='grid'>"; 
@@ -202,7 +228,7 @@
       }); 
       return html + "</div>"; 
     } 
- 
+
     function agregar(m,n,pr){ 
       if(!pedidos[m]) pedidos[m]=[]; 
       let existente = pedidos[m].find(p => p.nombre === n);
@@ -210,12 +236,12 @@
       else { pedidos[m].push({nombre:n, precio:pr, cantidad:1}); }
       guardar(); abrirMesa(m); 
     }
- 
+
     function agregarObservacion(m, i) {
       let nuevaObs = prompt("Observación:", pedidos[m][i].observacion || "");
       if (nuevaObs !== null) { pedidos[m][i].observacion = nuevaObs; guardar(); abrirMesa(m); }
     }
- 
+
     function mostrarLista(m){ 
       let html="<div class='lista'><b>📝 Pedido:</b><br>"; let total=0; 
       if(pedidos[m]){ 
@@ -230,57 +256,112 @@
       } 
       return html + `<br><b>TOTAL: $${total}</b></div>`; 
     }
- 
+
     function eliminarItem(m,i){ 
       if(pedidos[m][i].cantidad > 1) pedidos[m][i].cantidad--; 
       else pedidos[m].splice(i,1); 
       guardar(); abrirMesa(m); 
     }
- 
+
+    // --- FUNCIÓN CENTRAL DE PAGO E IMPRESIÓN ---
     function pagarMesa(m){
       if(!pedidos[m] || pedidos[m].length === 0) return;
       if(confirm("¿Cobrar e imprimir ticket?")){
-        let totalMesa = 0, itemsHTML = "", textoDetalles = "";
+        let totalMesa = 0, itemsHTML = "", textoBT = "   CASA GOURMET   \n\n";
+        textoBT += "MESA: " + m + "\nFECHA: " + new Date().toLocaleString() + "\n----------------\n";
+        
+        let textoDetalles = "";
         pedidos[m].forEach(p => {
           let cant = p.cantidad || 1; let subtotal = p.precio * cant; totalMesa += subtotal;
           itemsHTML += `<div style="display:flex; justify-content:space-between"><span>${cant}x ${p.nombre}</span><span>$${subtotal}</span></div>`;
-          if (p.observacion) itemsHTML += `<div style="text-align:left; font-size:18px; font-weight:bold; margin-top:-5px; margin-bottom:5px;">* Obs: ${p.observacion}</div>`;
+          textoBT += `${cant}x ${p.nombre} $${subtotal}\n`;
+          if (p.observacion) {
+            itemsHTML += `<div style="text-align:left; font-size:18px; font-weight:bold;">* Obs: ${p.observacion}</div>`;
+            textoBT += ` * Obs: ${p.observacion}\n`;
+          }
           textoDetalles += `${cant}x ${p.nombre}${p.observacion ? '(*'+p.observacion+')' : ''}, `;
         });
         
-        historialVentas.push({ hora: new Date().toLocaleTimeString(), mesa: m, total: totalMesa, detalles: textoDetalles.slice(0, -2) });
+        textoBT += "----------------\nTOTAL: $" + totalMesa + "\n\nGracias por su visita!";
         
+        // 1. Bluetooth
+        enviarTextoImpresora(textoBT);
+
+        // 2. Preparar Ticket Visual
         document.getElementById("t-fecha").innerText = new Date().toLocaleString();
         document.getElementById("t-mesa").innerText="MESA: "+m;
         document.getElementById("t-items").innerHTML = itemsHTML;
         document.getElementById("t-total").innerText = "TOTAL: $" + totalMesa;
         
-        // Disparar impresión nativa del sistema
-        imprimirConSelector("ticket-visual");
+        // 3. Captura html2canvas para Guardar PNG E Imprimir Sistema
+        const ticketElem = document.getElementById("ticket-visual");
+        document.getElementById("ticket-wrapper").style.display = "flex";
 
-        ventasDia += totalMesa;
-        delete pedidos[m];
-        guardar(); 
-        setTimeout(verMesas, 1000);
+        html2canvas(ticketElem, { scale: 2 }).then(canvas => {
+          const imgData = canvas.toDataURL("image/png");
+          
+          // GUARDAR IMAGEN (Tu función original)
+          let link = document.createElement('a');
+          link.download = 'Ticket-' + m + '.png';
+          link.href = imgData;
+          link.click();
+
+          // PREPARAR ZONA DE IMPRESIÓN DEL SISTEMA
+          const zona = document.getElementById("zona-impresion");
+          zona.innerHTML = `<img src="${imgData}">`;
+          
+          setTimeout(() => {
+            window.print(); // Dispara el menú del sistema
+            document.getElementById("ticket-wrapper").style.display = "none";
+            
+            // Finalizar proceso de venta
+            historialVentas.push({ hora: new Date().toLocaleTimeString(), mesa: m, total: totalMesa, detalles: textoDetalles.slice(0, -2) });
+            ventasDia += totalMesa;
+            delete pedidos[m];
+            guardar(); 
+            verMesas();
+          }, 500);
+        });
       }
     }
  
     function imprimirReporte() {
       if(historialVentas.length === 0) return alert("Sin ventas.");
-      let itemsHTML = "";
+      let itemsHTML = "", textoBT = " REPORTE CIERRE \n\n";
       historialVentas.forEach(v => {
         itemsHTML += `<div style="font-size:16px; border-bottom:1px solid #ddd; padding:5px 0"><b>${v.hora} - Mesa ${v.mesa}</b><br>${v.detalles}<br><b>$${v.total}</b></div>`;
+        textoBT += `${v.hora} M:${v.mesa} $${v.total}\n`;
       });
+      
       document.getElementById("r-fecha").innerText = new Date().toLocaleString();
       document.getElementById("r-items").innerHTML = itemsHTML;
       document.getElementById("r-total").innerText = "TOTAL DÍA: $" + ventasDia;
       document.getElementById("r-cantidad").innerText = "Ventas: " + historialVentas.length;
- 
+      
+      enviarTextoImpresora(textoBT + "\nTOTAL: $" + ventasDia);
+
       document.getElementById("ticket-visual").style.display = "none";
       document.getElementById("ticket-reporte").style.display = "block";
-      
-      imprimirConSelector("ticket-reporte");
-      setTimeout(() => { document.getElementById("ticket-reporte").style.display = "none"; }, 1500);
+      document.getElementById("ticket-wrapper").style.display = "flex";
+
+      html2canvas(document.getElementById("ticket-reporte"), {scale: 2}).then(canvas => {
+        const imgData = canvas.toDataURL("image/png");
+        
+        // Descargar Reporte
+        let link = document.createElement('a');
+        link.download = 'Reporte.png';
+        link.href = imgData;
+        link.click();
+
+        // Imprimir Reporte
+        document.getElementById("zona-impresion").innerHTML = `<img src="${imgData}">`;
+        setTimeout(() => {
+          window.print();
+          document.getElementById("ticket-wrapper").style.display = "none";
+          document.getElementById("ticket-reporte").style.display = "none";
+          document.getElementById("ticket-visual").style.display = "block";
+        }, 500);
+      });
     }
  
     function configCategorias(){
