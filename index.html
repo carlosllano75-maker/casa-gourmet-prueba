@@ -202,7 +202,7 @@
         <br><button onclick="reiniciarCaja()" style="background:#222; color:#ff4444; font-size:11px; margin-top:10px">Limpiar Todo</button>
       </div>`;
       html+="<button onclick='verHistorial()'>🕒 Ver Historial</button>";
-      html+="<br><button onclick='nuevoProducto()'>+ Nuevo Producto</button> <button onclick='configCategorias()'>📂 Categorías</button>";
+      html+="<br><button onclick='nuevoProducto()'>+ Nuevo Producto</button> <button onclick='configCategorias()'>📂 Categorías</button> <button onclick='gestionarProductos()'>✏️ Editar Productos</button>";
       html += `<div class="backup-box"><button onclick="exportarMenu()">📤 Exportar</button> <button onclick="importarMenu()">📥 Importar</button></div>`;
       document.getElementById("app").innerHTML=html; 
     }
@@ -430,6 +430,70 @@
         input.click();
     }
  
+    // --- NUEVAS FUNCIONES PARA EDITAR PRODUCTOS ---
+    
+    function gestionarProductos() {
+      let html = "<h3>Gestionar Productos</h3>";
+      if (menu.length === 0) {
+        html += "<p>No hay productos en el menú.</p>";
+      } else {
+        html += "<div class='grid'>";
+        menu.forEach((p, i) => {
+          html += `<div class='card' style='padding:10px; text-align:left;'>
+                     <b style='color:#d4af37'>${p.nombre}</b><br>
+                     Precio: $${p.precio}<br>
+                     Categoría: ${p.categoria}<br>
+                     <div style='margin-top:10px; display:flex; justify-content:space-around;'>
+                       <button class='btn-edit' onclick='editarProducto(${i})'>✏️ Editar</button>
+                       <button class='btn-danger' onclick='borrarProducto(${i})'>🗑️ Borrar</button>
+                     </div>
+                   </div>`;
+        });
+        html += "</div>";
+      }
+      html += "<br><button onclick='config()' style='background:#444; color:white'>⬅️ Volver</button>";
+      document.getElementById("app").innerHTML = html;
+    }
+
+    function editarProducto(index) {
+      let p = menu[index];
+      let html = `<h3>Editar Producto</h3>
+                  <input id='editProdNombre' value='${p.nombre}' placeholder='Nombre'><br>
+                  <input id='editProdPrecio' type='number' value='${p.precio}' placeholder='Precio'><br>
+                  <select id='editProdCategoria'>`;
+      categorias.forEach(c => { 
+        html += `<option value="${c}" ${p.categoria === c ? 'selected' : ''}>${c}</option>`; 
+      });
+      html += `</select><br><br>
+               <button onclick='guardarEdicionProducto(${index})'>✅ Guardar Cambios</button> 
+               <button onclick='gestionarProductos()' style='background:#444; color:white'>Cancelar</button>`;
+      document.getElementById("app").innerHTML = html;
+    }
+
+    function guardarEdicionProducto(index) {
+      let n = document.getElementById("editProdNombre").value;
+      let pr = document.getElementById("editProdPrecio").value;
+      let c = document.getElementById("editProdCategoria").value;
+      
+      if(n && pr && c) { 
+        menu[index] = {nombre: n, precio: parseFloat(pr), categoria: c}; 
+        guardar(); 
+        gestionarProductos(); 
+      } else {
+        alert("Por favor completa todos los campos.");
+      }
+    }
+
+    function borrarProducto(index) {
+      if(confirm("¿Seguro que deseas eliminar este producto?")) {
+        menu.splice(index, 1);
+        guardar();
+        gestionarProductos();
+      }
+    }
+
+    // ----------------------------------------------
+
     chequearAcceso();
   </script> 
 </body> 
