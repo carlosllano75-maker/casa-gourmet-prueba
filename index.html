@@ -3,498 +3,359 @@
 <head> 
   <meta charset="UTF-8"> 
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"> 
-  <title>Casa Gourmet POS Pro</title>
+  <title>Control de Inventario y Recetas</title>
+  <meta name="theme-color" content="#2c3e50">
   
-  <meta name="theme-color" content="#d4af37">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  
-  <link rel="icon" href="logo-casa-gourmet.jpg">
-  <link rel="apple-touch-icon" href="logo-casa-gourmet.jpg">
-  <link rel="manifest" href="manifest.json">
- 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- 
-  <style> 
-    body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#0b0b0b;color:#fff;margin:0;padding-bottom:50px;user-select:none;} 
-    header{background:#111;padding:20px 10px;text-align:center;border-bottom:2px solid #d4af37} 
-    .logo{max-height:80px;filter: drop-shadow(0 0 5px rgba(212,175,55,0.3))} 
-    .grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));gap:12px;padding:15px} 
-    .card{background:#1a1a1a;border-radius:15px;padding:15px;text-align:center;border:1px solid #333;box-shadow: 0 4px 6px rgba(0,0,0,0.3)} 
-    .card:active{transform: scale(0.98);background:#222}
-    button{padding:12px 18px;border:none;border-radius:10px;background:#d4af37;color:#000;font-weight:bold;margin:5px;cursor:pointer;transition:0.2s} 
-    button:active{opacity:0.7}
-    .btn-danger{background:#ff4444 !important;color:#fff;padding:5px 10px}
-    .btn-edit{background:#3498db !important;color:#fff;padding:5px 10px}
-    .btn-obs{background:#f39c12 !important;color:#fff;padding:5px 10px}
-    .lista{background:#111;padding:15px;border-radius:15px;margin:15px;border-left:4px solid #d4af37} 
-    select, input{padding:12px;border-radius:10px;margin:8px 0;background:#222;color:#fff;border:1px solid #444;width:80%;max-width:300px}
-    h3{color:#d4af37;margin-top:20px}
-    #app{padding:10px;text-align:center}
-    .item-pedido{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;border-bottom:1px dashed #333;padding-bottom:5px}
-    .backup-box{background:#222; padding:15px; border-radius:15px; margin:15px auto; max-width:400px; border:1px dashed #444}
-    
-    /* Configuración de Tickets Visuales */
-    #ticket-wrapper { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 10000; display: none; justify-content: center; align-items: center; }
-    .ticket-termico { width: 260px; background: white; color: black; padding: 20px; font-family: 'Courier New', Courier, monospace; text-align: center; }
-    .sep { border-top: 1px dashed #000; margin: 10px 0; }
- 
-    /* ESTILOS DE IMPRESIÓN DEL SISTEMA */
-    #zona-impresion { display: none; }
-    @media print {
-      body * { visibility: hidden; }
-      #zona-impresion, #zona-impresion * { visibility: visible; display: block !important; }
-      #zona-impresion { position: absolute; left: 0; top: 0; width: 100%; text-align: center; }
-      #zona-impresion img { width: 100%; max-width: 300px; }
-    }
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 
-    #bloqueo { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0b0b0b; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  <style> 
+    :root { --primary: #2c3e50; --accent: #e67e22; --success: #27ae60; --bg: #f4f7f6; --blue: #3498db; --warning: #f39c12; --danger: #e74c3c; }
+    body{font-family:'Segoe UI',Arial,sans-serif; background:var(--bg); color:#333; margin:0; padding-bottom:60px;} 
+    header{background: linear-gradient(135deg, var(--primary) 0%, #000 100%); padding:15px; text-align:center; color:white; border-bottom:4px solid var(--accent); position: sticky; top:0; z-index:1000;} 
+    .menu-superior{display:grid; grid-template-columns: repeat(3, 1fr); gap:5px; background:#ecf0f1; padding:10px;}
+    .grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; padding:10px} 
+    .card{background:white; border-radius:10px; padding:15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #eee; position:relative;} 
+    .stock-bajo { border: 2px solid var(--danger) !important; background: #fff5f5; }
+    button{padding:10px; border:none; border-radius:8px; background:var(--accent); color:white; font-weight:bold; cursor:pointer;} 
+    .btn-accion{background:var(--success); width:100%; margin-top:10px;}
+    .lista{background:white; padding:15px; border-radius:12px; margin:10px; border:1px solid #ddd;} 
+    .item-receta{display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding:8px 0;}
+    input, select{padding:12px; border-radius:8px; border:1px solid #ccc; width:92%; margin:8px auto; display:block; font-size:16px; box-sizing:border-box; width: 100%;}
+    .badge{background:var(--primary); color:white; padding:3px 8px; border-radius:5px; font-size:0.8em; font-weight:bold;}
+    
+    .form-group { margin-bottom: 15px; }
+    .form-group label { font-weight: bold; font-size: 0.9em; color: #555; margin-left: 5px; }
+    
+    #bloqueo { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--primary); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    #sync-status { position: fixed; bottom: 10px; right: 10px; font-size: 10px; color: #777; z-index: 3000; }
   </style> 
 </head> 
 <body> 
- 
-  <div id="zona-impresion"></div>
 
-  <div id="ticket-wrapper">
-    <div id="ticket-visual" class="ticket-termico">
-      <img src="logo-casa-gourmet.jpg" style="width: 220px; margin-bottom: 15px;"><br>
-      <b style="font-size: 24px;">CASA GOURMET</b><br>
-      <b id="t-mesa" style="font-size:26px;"></b><br>
-      <span id="t-fecha" style="font-size:18px; font-weight:bold;"></span><br>
-      <div class="sep"></div>
-      <div id="t-items" style="text-align:left; font-size:20px; font-weight:bold;"></div>
-      <div class="sep"></div>
-      <b id="t-total" style="font-size:30px"></b><br><br>
-      <b style="font-size: 24px;">"Esperamos que tu comida haya sido tan buena como tu compañía."</b>
-    </div>
-    <div id="ticket-reporte" class="ticket-termico" style="display:none">
-      <img src="logo-casa-gourmet.jpg" style="width: 120px;"><br>
-      <b style="font-size:20px;">REPORTE DE CIERRE</b><br>
-      <span id="r-fecha" style="font-size: 18px; font-weight: bold;"></span>
-      <div class="sep"></div>
-      <div id="r-items" style="text-align:left; font-size:16px; font-weight:bold;"></div>
-      <div class="sep"></div>
-      <b id="r-total" style="font-size:26px"></b><br>
-      <small id="r-cantidad"></small>
-    </div>
-  </div>
- 
+  <div id="sync-status">Nube: Conectado</div>
+  
   <div id="bloqueo">
-    <img src="logo-casa-gourmet.jpg" style="width:120px; border-radius:50%; margin-bottom:20px">
-    <h2 style="color:#d4af37">SISTEMA PROTEGIDO</h2>
-    <input type="password" id="passInput" placeholder="Clave de acceso" style="text-align:center"><br>
-    <button onclick="validarLicencia()">Activar Sistema</button>
+    <h2 style="color:white">SISTEMA DE INVENTARIO</h2>
+    <input type="password" id="passInput" placeholder="Clave de acceso (CARLOS2026)" style="text-align:center; width: 80%;"><br>
+    <button onclick="validarLicencia()" style="background:var(--success); padding: 15px 30px;">Ingresar</button>
   </div>
- 
+
   <div id="contenido-app" style="display:none">
-    <header> 
-      <img src="logo-casa-gourmet.jpg" class="logo"><br> 
-      <b>CASA GOURMET POS PRO</b> 
-    </header> 
-    
-    <div style="text-align:center;padding:15px;background:#161616"> 
-      <button onclick="verMesas()">🍽️ Mesas</button> 
-      <button onclick="config()" style="background:#444;color:#fff">⚙️ Ajustes</button> 
-    </div> 
-    
-    <div id="app"></div> 
+    <header><b>📦 CONTROL DE INVENTARIO Y RECETAS</b></header> 
+    <div class="menu-superior">
+      <button onclick="verIngredientes()">🍅 Ingredientes</button>
+      <button onclick="verRecetas()">🍔 Recetas</button>
+      <button onclick="verDescarga()" style="background:var(--success);">📉 Descontar Consumo</button>
+      <button onclick="verHistorial()" style="background:#7f8c8d; grid-column: span 3;">📊 Historial de Movimientos</button>
+    </div>
+    <div id="app" style="padding: 10px;"></div> 
   </div>
- 
+
   <script> 
-    const CLAVE_MAESTRA = "GOURMET2024";
-    const DIAS_LICENCIA = 3; 
- 
-    let menu=JSON.parse(localStorage.getItem("menu")||"[]"); 
-    let pedidos=JSON.parse(localStorage.getItem("pedidos")||"{}"); 
-    let categorias=JSON.parse(localStorage.getItem("categorias")||"[]"); 
-    let ventasDia=parseFloat(localStorage.getItem("ventasDia")||"0");
-    let listaMesas=JSON.parse(localStorage.getItem("listaMesas")||"[1,2,3,4,5,6,7,8,9,10,11,12]");
-    let historialVentas=JSON.parse(localStorage.getItem("historialVentas")||"[]");
- 
-    let printCharacteristic = null;
+    // --- CONFIGURACIÓN DE FIREBASE ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyBe4KD0YDZj2XCIhhqcT1bp30xbtRHOszk",
+      authDomain: "bodeguita-pro.firebaseapp.com",
+      projectId: "bodeguita-pro",
+      storageBucket: "bodeguita-pro.firebasestorage.app",
+      messagingSenderId: "904643526992",
+      appId: "1:904643526992:web:93b57a49a3841194ceec55"
+    };
 
-    function guardar(){
-      localStorage.setItem("menu",JSON.stringify(menu));
-      localStorage.setItem("pedidos",JSON.stringify(pedidos));
-      localStorage.setItem("categorias",JSON.stringify(categorias));
-      localStorage.setItem("ventasDia",ventasDia.toString());
-      localStorage.setItem("listaMesas",JSON.stringify(listaMesas));
-      localStorage.setItem("historialVentas",JSON.stringify(historialVentas));
-    }
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const CLAVE_MAESTRA = "CARLOS2026";
 
-    async function conectarBluetooth() {
-      try {
-        const device = await navigator.bluetooth.requestDevice({
-          acceptAllDevices: true,
-          optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb', 'e7810a71-73ae-499d-8c15-faa9aef0c3f2', '0000fee7-0000-1000-8000-00805f9b34fb']
-        });
-        const server = await device.gatt.connect();
-        const services = await server.getPrimaryServices();
-        let service = services.find(s => s.uuid.startsWith('000018f0') || s.uuid.startsWith('e7810a71') || s.uuid.startsWith('0000fee7')) || services[0];
-        const characteristics = await service.getCharacteristics();
-        printCharacteristic = characteristics.find(c => c.properties.write || c.properties.writeWithoutResponse);
-        alert("✅ Impresora conectada: " + device.name);
-      } catch (error) {
-        alert("❌ Error: " + error.message);
-      }
-    }
+    // Variables globales
+    let ingredientes = [];
+    let recetas = [];
+    let historial = [];
+    
+    // Variables temporales para creación de recetas
+    let recetaTemporal = { nombre: "", items: [] };
+    let editandoRecetaIdx = -1;
 
-    async function enviarTextoImpresora(texto) {
-      if (!printCharacteristic) return;
-      try {
-        let textoLimpio = texto.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); 
-        let encoder = new TextEncoder();
-        let textArray = encoder.encode(textoLimpio + "\n\n\n\n"); 
-        let CHUNK_SIZE = 20;
-        for (let i = 0; i < textArray.length; i += CHUNK_SIZE) {
-          await printCharacteristic.writeValue(textArray.slice(i, i + CHUNK_SIZE));
-          await new Promise(resolve => setTimeout(resolve, 20));
+    // --- SINCRONIZACIÓN NUBE ---
+    function cargarDatosDesdeNube() {
+      document.getElementById('sync-status').innerText = "Nube: Cargando...";
+      db.ref('inventario_restaurante_v2').once('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          ingredientes = data.ingredientes || [];
+          recetas = data.recetas || [];
+          historial = data.historial || [];
         }
-      } catch (e) { console.error(e); }
+        document.getElementById('sync-status').innerText = "Nube: Sincronizado";
+        verIngredientes(); 
+      });
     }
- 
+
+    function guardar() {
+      document.getElementById('sync-status').innerText = "Nube: Guardando...";
+      db.ref('inventario_restaurante_v2').set({
+        ingredientes, recetas, historial
+      }).then(() => {
+        document.getElementById('sync-status').innerText = "Nube: Sincronizado";
+      });
+    }
+
     function validarLicencia() {
       if(document.getElementById("passInput").value === CLAVE_MAESTRA) {
-        let fechaVencimiento = new Date().getTime() + (DIAS_LICENCIA * 24 * 60 * 60 * 1000);
-        localStorage.setItem("licencia_activa", "true");
-        localStorage.setItem("fecha_vencimiento", fechaVencimiento);
-        chequearAcceso();
-      } else { alert("Clave incorrecta"); }
-    }
- 
-    function chequearAcceso() {
-      let activa = localStorage.getItem("licencia_activa");
-      let vencimiento = parseInt(localStorage.getItem("fecha_vencimiento"));
-      let hoy = new Date().getTime();
-      if(activa === "true" && vencimiento && hoy < vencimiento) {
         document.getElementById("bloqueo").style.display = "none";
         document.getElementById("contenido-app").style.display = "block";
-        verMesas();
+        cargarDatosDesdeNube();
+      } else alert("Clave incorrecta");
+    }
+
+    // ================= MÓDULO: INGREDIENTES =================
+    function verIngredientes() {
+      let html = `<h3>🍅 Ingredientes (Materia Prima)</h3>
+                  <button onclick='abrirFormIngrediente()' class='btn-accion'>+ Nuevo Ingrediente</button>
+                  <div class='grid' style='margin-top:15px;'>`;
+      
+      ingredientes.forEach((ing, i) => {
+        let esBajo = ing.stock <= ing.minimo;
+        html += `<div class='card ${esBajo ? 'stock-bajo' : ''}'>
+                  ${esBajo ? '<div style="color:red;font-size:11px;font-weight:bold;">⚠️ STOCK BAJO</div>' : ''}
+                  <b style="font-size:1.1em">${ing.nombre}</b><br>
+                  <span class='badge'>${ing.stock} ${ing.unidad}</span><br>
+                  <small>Min: ${ing.minimo} ${ing.unidad}</small><br>
+                  <div style="margin-top:10px; display:flex; gap:5px;">
+                    <button onclick='abrirFormIngrediente(${i})' style='background:var(--blue); flex:1'>✏️ Editar</button>
+                    <button onclick='if(confirm("¿Eliminar ingrediente?")){ingredientes.splice(${i},1);guardar();verIngredientes()}' style='background:var(--danger); flex:1'>🗑️</button>
+                  </div>
+                 </div>`;
+      });
+      document.getElementById("app").innerHTML = html + "</div>";
+    }
+
+    function abrirFormIngrediente(idx = -1) {
+      let ing = idx !== -1 ? ingredientes[idx] : {nombre:"", unidad:"gr", stock:0, minimo:0};
+      document.getElementById("app").innerHTML = `
+        <div class="lista">
+          <h3>${idx!==-1?'Editar':'Nuevo'} Ingrediente</h3>
+          <div class="form-group"><label>Nombre del Ingrediente</label>
+            <input id='i-nombre' placeholder='Ej. Carne Molida, Pan Hamburguesa' value='${ing.nombre}'></div>
+          <div class="form-group"><label>Unidad de Medida</label>
+            <select id='i-unidad'>
+              <option value="gr" ${ing.unidad==='gr'?'selected':''}>Gramos (gr)</option>
+              <option value="ml" ${ing.unidad==='ml'?'selected':''}>Mililitros (ml)</option>
+              <option value="und" ${ing.unidad==='und'?'selected':''}>Unidades (und)</option>
+            </select></div>
+          <div class="form-group"><label>Stock Actual</label>
+            <input id='i-stock' type='number' step='any' placeholder='Cantidad en inventario' value='${ing.stock}'></div>
+          <div class="form-group"><label>Alerta de Stock Mínimo</label>
+            <input id='i-minimo' type='number' step='any' placeholder='Avisar cuando llegue a...' value='${ing.minimo}'></div>
+          <button onclick='guardarIngrediente(${idx})' class='btn-accion'>💾 Guardar Ingrediente</button>
+          <button onclick='verIngredientes()' style='width:100%; margin-top:10px; background:#95a5a6'>Cancelar</button>
+        </div>`;
+    }
+
+    function guardarIngrediente(idx) {
+      let obj = {
+        nombre: document.getElementById('i-nombre').value,
+        unidad: document.getElementById('i-unidad').value,
+        stock: parseFloat(document.getElementById('i-stock').value) || 0,
+        minimo: parseFloat(document.getElementById('i-minimo').value) || 0
+      };
+      if(!obj.nombre) return alert("El nombre es obligatorio");
+      
+      if(idx === -1) ingredientes.push(obj);
+      else ingredientes[idx] = obj;
+      
+      guardar(); verIngredientes();
+    }
+
+    // ================= MÓDULO: RECETAS =================
+    function verRecetas() {
+      let html = `<h3>🍔 Recetas / Platillos</h3>
+                  <button onclick='prepararNuevaReceta()' class='btn-accion'>+ Crear Nueva Receta</button>
+                  <div class='grid' style='margin-top:15px;'>`;
+      
+      recetas.forEach((receta, i) => {
+        html += `<div class='card'>
+                  <b style="font-size:1.2em">${receta.nombre}</b><br>
+                  <small>${receta.items.length} ingredientes configurados</small><br>
+                  <div style="margin-top:10px; display:flex; gap:5px;">
+                    <button onclick='editarReceta(${i})' style='background:var(--blue); flex:1'>✏️ Configurar</button>
+                    <button onclick='if(confirm("¿Eliminar receta?")){recetas.splice(${i},1);guardar();verRecetas()}' style='background:var(--danger); flex:1'>🗑️</button>
+                  </div>
+                 </div>`;
+      });
+      document.getElementById("app").innerHTML = html + "</div>";
+    }
+
+    function prepararNuevaReceta() {
+      recetaTemporal = { nombre: "", items: [] };
+      editandoRecetaIdx = -1;
+      renderFormularioReceta();
+    }
+
+    function editarReceta(idx) {
+      recetaTemporal = JSON.parse(JSON.stringify(recetas[idx])); // Copia profunda
+      editandoRecetaIdx = idx;
+      renderFormularioReceta();
+    }
+
+    function renderFormularioReceta() {
+      if(ingredientes.length === 0) {
+        alert("Primero debes crear ingredientes en el inventario.");
+        return verIngredientes();
+      }
+
+      let htmlItems = "";
+      recetaTemporal.items.forEach((item, indexItem) => {
+        let ingData = ingredientes.find(i => i.nombre === item.nombreIngrediente);
+        let unidad = ingData ? ingData.unidad : "?";
+        htmlItems += `<div class='item-receta'>
+                        <div><b>${item.nombreIngrediente}</b> <br><small>Resta: ${item.cantidad} ${unidad}</small></div>
+                        <button onclick='quitarIngredienteReceta(${indexItem})' style='background:red; padding:5px 10px;'>X</button>
+                      </div>`;
+      });
+
+      let opcionesIngredientes = ingredientes.map(ing => `<option value="${ing.nombre}">${ing.nombre} (${ing.unidad})</option>`).join("");
+
+      document.getElementById("app").innerHTML = `
+        <div class="lista">
+          <h3>${editandoRecetaIdx !== -1 ? 'Editar' : 'Nueva'} Receta</h3>
+          <div class="form-group">
+            <label>Nombre del Platillo</label>
+            <input id='r-nombre' placeholder='Ej. Hamburguesa Doble' value='${recetaTemporal.nombre}' oninput='recetaTemporal.nombre = this.value'>
+          </div>
+          <hr>
+          <h4>Fórmula / Ingredientes</h4>
+          ${htmlItems || "<p style='color:#777; font-size:14px;'>No hay ingredientes añadidos. Usa el panel de abajo.</p>"}
+          
+          <div style="background:#f9f9f9; padding:10px; border-radius:8px; margin-top:15px; border:1px solid #ddd;">
+            <select id='r-ing-select'>${opcionesIngredientes}</select>
+            <input id='r-ing-cant' type='number' step='any' placeholder='Cantidad a descontar'>
+            <button onclick='agregarIngredienteReceta()' style='width:100%; background:var(--primary); margin-top:5px;'>+ Añadir a la receta</button>
+          </div>
+          
+          <button onclick='guardarRecetaFinal()' class='btn-accion' style='margin-top:20px; font-size:1.1em; padding:15px;'>💾 GUARDAR RECETA</button>
+          <button onclick='verRecetas()' style='width:100%; margin-top:10px; background:#95a5a6'>Cancelar</button>
+        </div>`;
+    }
+
+    function agregarIngredienteReceta() {
+      let nombreIng = document.getElementById('r-ing-select').value;
+      let cantidad = parseFloat(document.getElementById('r-ing-cant').value);
+      
+      if(!cantidad || cantidad <= 0) return alert("Ingresa una cantidad válida.");
+      
+      // Evitar duplicados
+      let existe = recetaTemporal.items.findIndex(i => i.nombreIngrediente === nombreIng);
+      if(existe !== -1) {
+        recetaTemporal.items[existe].cantidad += cantidad;
       } else {
-        document.getElementById("bloqueo").style.display = "flex";
+        recetaTemporal.items.push({ nombreIngrediente: nombreIng, cantidad: cantidad });
       }
-    }
- 
-    function verMesas(){ 
-      let html="<div style='margin-bottom:10px'><button onclick='agregarNuevaMesa()' style='background:#28a745; color:white; width:90%'>+ Nueva Mesa / Barra</button></div>";
-      html+="<div class='grid'>"; 
-      listaMesas.forEach(i => { 
-        let total=0; 
-        if(pedidos[i]) pedidos[i].forEach(p => total += (p.precio * (p.cantidad || 1))); 
-        let colorMesa = total > 0 ? "border:1px solid #d4af37; background:#252115" : "";
-        html+=`<div class='card' style='${colorMesa}'><b>Mesa ${i}</b><br><span style='color:${total>0?"#0f0":"#666"}'>$${total}</span> 
-        <br><button onclick='abrirMesa("${i}")'>${total>0?"Editar":"Abrir"}</button></div>`; 
-      }); 
-      html+="</div>"; document.getElementById("app").innerHTML=html; 
-    } 
- 
-    function config(){ 
-      let html="<h3>Ajustes de Sistema</h3>";
-      let estadoBT = printCharacteristic ? "🟢 Conectada" : "🔴 Desconectada";
-      html+=`<div class="backup-box" style="border-color:#3498db">
-        <small style="color:#3498db">IMPRESORA BLUETOOTH (${estadoBT})</small><br>
-        <button onclick="conectarBluetooth()" style="background:#3498db; color:white; margin-top:10px">🖨️ Conectar Impresora</button>
-      </div>`;
-      html+=`<div class="backup-box" style="border-color:#d4af37">
-        <small style="color:#d4af37">VENTAS ACUMULADAS</small><br>
-        <b style="font-size:24px">$${ventasDia}</b><br>
-        <button onclick="imprimirReporte()" style="background:#28a745; color:white; margin-top:10px">🖨️ Reporte del Día</button>
-        <br><button onclick="reiniciarCaja()" style="background:#222; color:#ff4444; font-size:11px; margin-top:10px">Limpiar Todo</button>
-      </div>`;
-      html+="<button onclick='verHistorial()'>🕒 Ver Historial</button>";
-      html+="<br><button onclick='nuevoProducto()'>+ Nuevo Producto</button> <button onclick='configCategorias()'>📂 Categorías</button> <button onclick='gestionarProductos()'>✏️ Editar Productos</button>";
-      html += `<div class="backup-box"><button onclick="exportarMenu()">📤 Exportar</button> <button onclick="importarMenu()">📥 Importar</button></div>`;
-      document.getElementById("app").innerHTML=html; 
-    }
- 
-    function abrirMesa(m){ 
-      let html=`<h3>Mesa ${m}</h3>`; 
-      let cats = [...new Set(menu.map(p=>p.categoria))];
-      html+=`<select onchange='filtrarCategoria("${m}",this.value)' style='width:90%'><option value="">Todo</option>`;
-      cats.forEach(cat=>{ html+=`<option value="${cat}">${cat}</option>`; });
-      html+="</select><div id='productos-container'>"+mostrarProductos(m,"")+"</div>"; 
-      html+=mostrarLista(m); 
-      html+=`<br><button onclick='enviarWhatsApp("${m}")' style='background:#25D366; color:white; width:90%'>📱 WhatsApp</button>`;
-      html+=`<br><button onclick='pagarMesa("${m}")' style='background:#28a745; color:white; width:90%; margin-top:10px'>💰 Cobrar e Imprimir</button>`;
-      html+=`<br><button onclick='verMesas()' style='background:#444; color:white; margin-top:10px'>⬅️ Volver</button>`; 
-      document.getElementById("app").innerHTML=html; 
-    } 
-
-    function filtrarCategoria(m,cat){ document.getElementById('productos-container').innerHTML = mostrarProductos(m,cat); }
-    function mostrarProductos(m,cat){ 
-      let html="<div class='grid'>"; 
-      menu.filter(p=>!cat || p.categoria===cat).forEach(p=>{
-        html+=`<div class='card' style='padding:10px'>${p.nombre}<br><b>$${p.precio}</b><br><button onclick='agregar("${m}","${p.nombre}",${p.precio})'>➕</button></div>`; 
-      }); 
-      return html + "</div>"; 
-    } 
-
-    function agregar(m,n,pr){ 
-      if(!pedidos[m]) pedidos[m]=[]; 
-      let existente = pedidos[m].find(p => p.nombre === n);
-      if(existente){ existente.cantidad++; } 
-      else { pedidos[m].push({nombre:n, precio:pr, cantidad:1}); }
-      guardar(); abrirMesa(m); 
+      renderFormularioReceta();
     }
 
-    function agregarObservacion(m, i) {
-      let nuevaObs = prompt("Observación:", pedidos[m][i].observacion || "");
-      if (nuevaObs !== null) { pedidos[m][i].observacion = nuevaObs; guardar(); abrirMesa(m); }
+    function quitarIngredienteReceta(indexItem) {
+      recetaTemporal.items.splice(indexItem, 1);
+      renderFormularioReceta();
     }
 
-    function mostrarLista(m){ 
-      let html="<div class='lista'><b>📝 Pedido:</b><br>"; let total=0; 
-      if(pedidos[m]){ 
-        pedidos[m].forEach((p,i)=>{ 
-          let cant = p.cantidad || 1; let subtotal = p.precio * cant; total += subtotal; 
-          let txtObs = p.observacion ? `<br><span style="color:#f39c12;font-size:16px;font-weight:bold;">Nota: ${p.observacion}</span>` : "";
-          html+=`<div class='item-pedido'>
-                    <div style="text-align:left">${cant}x ${p.nombre}${txtObs}</div> 
-                    <div>$${subtotal} <button class='btn-obs' onclick='agregarObservacion("${m}",${i})'>📝</button> <button class='btn-danger' onclick='eliminarItem("${m}",${i})'>x</button></div>
-                 </div>`; 
-        }); 
-      } 
-      return html + `<br><b>TOTAL: $${total}</b></div>`; 
+    function guardarRecetaFinal() {
+      if(!recetaTemporal.nombre) return alert("La receta debe tener un nombre.");
+      if(recetaTemporal.items.length === 0) return alert("Añade al menos un ingrediente a la receta.");
+
+      if(editandoRecetaIdx === -1) recetas.push(recetaTemporal);
+      else recetas[editandoRecetaIdx] = recetaTemporal;
+
+      guardar(); verRecetas();
     }
 
-    function eliminarItem(m,i){ 
-      if(pedidos[m][i].cantidad > 1) pedidos[m][i].cantidad--; 
-      else pedidos[m].splice(i,1); 
-      guardar(); abrirMesa(m); 
-    }
-
-    // --- FUNCIÓN CENTRAL DE PAGO E IMPRESIÓN ---
-    function pagarMesa(m){
-      if(!pedidos[m] || pedidos[m].length === 0) return;
-      if(confirm("¿Cobrar e imprimir ticket?")){
-        let totalMesa = 0, itemsHTML = "", textoBT = "   CASA GOURMET   \n\n";
-        textoBT += "MESA: " + m + "\nFECHA: " + new Date().toLocaleString() + "\n----------------\n";
-        
-        let textoDetalles = "";
-        pedidos[m].forEach(p => {
-          let cant = p.cantidad || 1; let subtotal = p.precio * cant; totalMesa += subtotal;
-          itemsHTML += `<div style="display:flex; justify-content:space-between"><span>${cant}x ${p.nombre}</span><span>$${subtotal}</span></div>`;
-          textoBT += `${cant}x ${p.nombre} $${subtotal}\n`;
-          if (p.observacion) {
-            itemsHTML += `<div style="text-align:left; font-size:18px; font-weight:bold;">* Obs: ${p.observacion}</div>`;
-            textoBT += ` * Obs: ${p.observacion}\n`;
-          }
-          textoDetalles += `${cant}x ${p.nombre}${p.observacion ? '(*'+p.observacion+')' : ''}, `;
-        });
-        
-        textoBT += "----------------\nTOTAL: $" + totalMesa + "\n\nGracias por su visita!";
-        
-        // 1. Bluetooth
-        enviarTextoImpresora(textoBT);
-
-        // 2. Preparar Ticket Visual
-        document.getElementById("t-fecha").innerText = new Date().toLocaleString();
-        document.getElementById("t-mesa").innerText="MESA: "+m;
-        document.getElementById("t-items").innerHTML = itemsHTML;
-        document.getElementById("t-total").innerText = "TOTAL: $" + totalMesa;
-        
-        // 3. Captura html2canvas para Guardar PNG E Imprimir Sistema
-        const ticketElem = document.getElementById("ticket-visual");
-        document.getElementById("ticket-wrapper").style.display = "flex";
-
-        html2canvas(ticketElem, { scale: 2 }).then(canvas => {
-          const imgData = canvas.toDataURL("image/png");
-          
-          // GUARDAR IMAGEN (Tu función original)
-          let link = document.createElement('a');
-          link.download = 'Ticket-' + m + '.png';
-          link.href = imgData;
-          link.click();
-
-          // PREPARAR ZONA DE IMPRESIÓN DEL SISTEMA
-          const zona = document.getElementById("zona-impresion");
-          zona.innerHTML = `<img src="${imgData}">`;
-          
-          setTimeout(() => {
-            window.print(); // Dispara el menú del sistema
-            document.getElementById("ticket-wrapper").style.display = "none";
-            
-            // Finalizar proceso de venta
-            historialVentas.push({ hora: new Date().toLocaleTimeString(), mesa: m, total: totalMesa, detalles: textoDetalles.slice(0, -2) });
-            ventasDia += totalMesa;
-            delete pedidos[m];
-            guardar(); 
-            verMesas();
-          }, 500);
-        });
+    // ================= MÓDULO: DESCARGA DE INVENTARIO =================
+    function verDescarga() {
+      if(recetas.length === 0) {
+        document.getElementById("app").innerHTML = `<div class="lista"><h3>No hay recetas</h3><p>Crea recetas primero para poder registrar consumos.</p></div>`;
+        return;
       }
+
+      let opcionesRecetas = recetas.map((r, i) => `<option value="${i}">${r.nombre}</option>`).join("");
+
+      document.getElementById("app").innerHTML = `
+        <div class="lista">
+          <h3>📉 Registrar Consumo / Venta</h3>
+          <p style="font-size:14px; color:#555;">Selecciona el platillo vendido y la cantidad. El sistema descontará automáticamente los ingredientes configurados.</p>
+          
+          <div class="form-group">
+            <label>Platillo Vendido</label>
+            <select id='d-receta'>${opcionesRecetas}</select>
+          </div>
+          
+          <div class="form-group">
+            <label>Cantidad (Porciones/Platos)</label>
+            <input id='d-cant' type='number' value='1' min='1'>
+          </div>
+
+          <div class="form-group">
+            <label>Nota (Opcional)</label>
+            <input id='d-nota' type='text' placeholder='Ej. Mesa 4, Pedido #12'>
+          </div>
+
+          <button onclick='ejecutarDescarga()' style='background:var(--success); width:100%; padding:15px; font-size:1.1em;'>⚡ DESCONTAR DEL INVENTARIO</button>
+        </div>`;
     }
- 
-    function imprimirReporte() {
-      if(historialVentas.length === 0) return alert("Sin ventas.");
-      let itemsHTML = "", textoBT = " REPORTE CIERRE \n\n";
-      historialVentas.forEach(v => {
-        itemsHTML += `<div style="font-size:16px; border-bottom:1px solid #ddd; padding:5px 0"><b>${v.hora} - Mesa ${v.mesa}</b><br>${v.detalles}<br><b>$${v.total}</b></div>`;
-        textoBT += `${v.hora} M:${v.mesa} $${v.total}\n`;
-      });
+
+    function ejecutarDescarga() {
+      let idxReceta = document.getElementById('d-receta').value;
+      let cantidadPlatos = parseInt(document.getElementById('d-cant').value);
+      let nota = document.getElementById('d-nota').value || "Venta general";
       
-      document.getElementById("r-fecha").innerText = new Date().toLocaleString();
-      document.getElementById("r-items").innerHTML = itemsHTML;
-      document.getElementById("r-total").innerText = "TOTAL DÍA: $" + ventasDia;
-      document.getElementById("r-cantidad").innerText = "Ventas: " + historialVentas.length;
-      
-      enviarTextoImpresora(textoBT + "\nTOTAL: $" + ventasDia);
+      if(!cantidadPlatos || cantidadPlatos <= 0) return alert("Cantidad inválida");
 
-      document.getElementById("ticket-visual").style.display = "none";
-      document.getElementById("ticket-reporte").style.display = "block";
-      document.getElementById("ticket-wrapper").style.display = "flex";
+      let receta = recetas[idxReceta];
+      let desgloseDescuentos = [];
 
-      html2canvas(document.getElementById("ticket-reporte"), {scale: 2}).then(canvas => {
-        const imgData = canvas.toDataURL("image/png");
-        
-        // Descargar Reporte
-        let link = document.createElement('a');
-        link.download = 'Reporte.png';
-        link.href = imgData;
-        link.click();
-
-        // Imprimir Reporte
-        document.getElementById("zona-impresion").innerHTML = `<img src="${imgData}">`;
-        setTimeout(() => {
-          window.print();
-          document.getElementById("ticket-wrapper").style.display = "none";
-          document.getElementById("ticket-reporte").style.display = "none";
-          document.getElementById("ticket-visual").style.display = "block";
-        }, 500);
-      });
-    }
- 
-    function configCategorias(){
-      let html="<h3>Categorías</h3><button onclick='nuevaCategoria()'>+ Nueva</button>";
-      categorias.forEach((c,i)=>{ html+=`<div class='card'>${c} <button class='btn-danger' onclick='eliminarCategoria(${i})'>🗑️</button></div>`; });
-      html+="<br><button onclick='config()'>Volver</button>";
-      document.getElementById("app").innerHTML=html;
-    }
-    function nuevaCategoria(){ let c=prompt("Nombre"); if(c && !categorias.includes(c)){ categorias.push(c); guardar(); configCategorias(); } }
-    function eliminarCategoria(i){ if(confirm("¿Eliminar?")){ menu=menu.filter(p=>p.categoria!==categorias[i]); categorias.splice(i,1); guardar(); configCategorias(); } }
-    function agregarNuevaMesa() { let n = prompt("Nombre:"); if(n && !listaMesas.includes(n)) { listaMesas.push(n); guardar(); verMesas(); } }
-    function nuevoProducto(){ 
-      let html="<h3>Nuevo Producto</h3><input id='prodNombre' placeholder='Nombre'><br><input id='prodPrecio' type='number' placeholder='Precio'><br><select id='prodCategoria'>";
-      categorias.forEach(c=>{ html+=`<option value="${c}">${c}</option>`; });
-      html+="</select><br><br><button onclick='guardarNuevoProducto()'>✅ Guardar</button> <button onclick='config()' style='background:#444'>Cancelar</button>";
-      document.getElementById("app").innerHTML=html;
-    }
-    function guardarNuevoProducto(){
-      let n=document.getElementById("prodNombre").value, pr=document.getElementById("prodPrecio").value, c=document.getElementById("prodCategoria")?.value;
-      if(n && pr && c){ menu.push({nombre:n,precio:parseFloat(pr),categoria:c}); guardar(); config(); }
-    }
-    function reiniciarCaja(){ if(confirm("¿Limpiar historial?")){ ventasDia = 0; historialVentas = []; guardar(); config(); } }
-    function verHistorial() {
-      let html="<h3>Historial de Hoy</h3>";
-      historialVentas.slice().reverse().forEach(v => {
-        html += `<div class='card' style='text-align:left; margin-bottom:10px'><small>${v.hora}</small> | <b>Mesa ${v.mesa}</b><br><small>${v.detalles}</small><br><b style='color:#0f0'>$${v.total}</b></div>`;
-      });
-      html += "<br><button onclick='config()'>Volver</button>";
-      document.getElementById("app").innerHTML = html;
-    }
-    
-    function enviarWhatsApp(m) {
-      if (!pedidos[m]) return;
-      let texto = "*CASA GOURMET*\n*Mesa " + m + "*\n\n";
-      let total = 0;
-      pedidos[m].forEach(p => { 
-        let cant = p.cantidad || 1; let subtotal = p.precio * cant; total += subtotal;
-        texto += "- " + cant + "x " + p.nombre + (p.observacion ? " (*" + p.observacion + "*)" : "") + ": $" + subtotal + "\n"; 
-      });
-      texto += "\n*TOTAL: $" + total + "*";
-      window.open("https://api.whatsapp.com/send?text=" + encodeURIComponent(texto), '_blank');
-    }
-
-    function exportarMenu() {
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({menu, categorias, listaMesas}));
-        const downloadAnchorNode = document.createElement('a');
-        downloadAnchorNode.setAttribute("href", dataStr);
-        downloadAnchorNode.setAttribute("download", "respaldo_casa_gourmet.json");
-        document.body.appendChild(downloadAnchorNode);
-        downloadAnchorNode.click();
-        downloadAnchorNode.remove();
-    }
-
-    function importarMenu() {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.onchange = e => {
-            const reader = new FileReader();
-            reader.onload = ev => {
-                const content = JSON.parse(ev.target.result);
-                menu = content.menu; categorias = content.categorias; if(content.listaMesas) listaMesas = content.listaMesas;
-                guardar(); alert("✅ Sistema cargado"); location.reload();
-            };
-            reader.readAsText(e.target.files[0]);
+      // Validar y ejecutar descuentos
+      receta.items.forEach(item => {
+        let ingIdx = ingredientes.findIndex(i => i.nombre === item.nombreIngrediente);
+        if(ingIdx !== -1) {
+          let cantDescontar = item.cantidad * cantidadPlatos;
+          ingredientes[ingIdx].stock -= cantDescontar;
+          desgloseDescuentos.push(`${cantDescontar} ${ingredientes[ingIdx].unidad} de ${item.nombreIngrediente}`);
         }
-        input.click();
-    }
- 
-    // --- NUEVAS FUNCIONES PARA EDITAR PRODUCTOS ---
-    
-    function gestionarProductos() {
-      let html = "<h3>Gestionar Productos</h3>";
-      if (menu.length === 0) {
-        html += "<p>No hay productos en el menú.</p>";
-      } else {
-        html += "<div class='grid'>";
-        menu.forEach((p, i) => {
-          html += `<div class='card' style='padding:10px; text-align:left;'>
-                     <b style='color:#d4af37'>${p.nombre}</b><br>
-                     Precio: $${p.precio}<br>
-                     Categoría: ${p.categoria}<br>
-                     <div style='margin-top:10px; display:flex; justify-content:space-around;'>
-                       <button class='btn-edit' onclick='editarProducto(${i})'>✏️ Editar</button>
-                       <button class='btn-danger' onclick='borrarProducto(${i})'>🗑️ Borrar</button>
-                     </div>
-                   </div>`;
-        });
-        html += "</div>";
-      }
-      html += "<br><button onclick='config()' style='background:#444; color:white'>⬅️ Volver</button>";
-      document.getElementById("app").innerHTML = html;
-    }
-
-    function editarProducto(index) {
-      let p = menu[index];
-      let html = `<h3>Editar Producto</h3>
-                  <input id='editProdNombre' value='${p.nombre}' placeholder='Nombre'><br>
-                  <input id='editProdPrecio' type='number' value='${p.precio}' placeholder='Precio'><br>
-                  <select id='editProdCategoria'>`;
-      categorias.forEach(c => { 
-        html += `<option value="${c}" ${p.categoria === c ? 'selected' : ''}>${c}</option>`; 
       });
-      html += `</select><br><br>
-               <button onclick='guardarEdicionProducto(${index})'>✅ Guardar Cambios</button> 
-               <button onclick='gestionarProductos()' style='background:#444; color:white'>Cancelar</button>`;
+
+      // Guardar historial
+      historial.unshift({
+        fecha: new Date().toLocaleString(),
+        accion: `Se prepararon ${cantidadPlatos}x ${receta.nombre}`,
+        nota: nota,
+        detalles: desgloseDescuentos.join(", ")
+      });
+
+      // Mantener historial a los últimos 100 registros para no saturar memoria
+      if(historial.length > 100) historial.pop();
+
+      guardar();
+      alert(`✅ Inventario descontado con éxito para ${cantidadPlatos}x ${receta.nombre}.`);
+      verDescarga();
+    }
+
+    // ================= MÓDULO: HISTORIAL =================
+    function verHistorial() {
+      let html = `<h3>📊 Últimos Movimientos</h3>`;
+      if(historial.length === 0) html += "<p>No hay movimientos registrados.</p>";
+      
+      historial.forEach(h => {
+        html += `<div class='lista' style='padding:10px; margin-bottom:10px;'>
+                  <div style="font-size:12px; color:#888;">${h.fecha}</div>
+                  <b>${h.accion}</b><br>
+                  <small style="color:var(--blue)">📝 ${h.nota}</small><br>
+                  <div style="font-size:12px; margin-top:5px; background:#f9f9f9; padding:5px; border-radius:5px;">
+                    <i>Descontado:</i> ${h.detalles}
+                  </div>
+                 </div>`;
+      });
       document.getElementById("app").innerHTML = html;
     }
-
-    function guardarEdicionProducto(index) {
-      let n = document.getElementById("editProdNombre").value;
-      let pr = document.getElementById("editProdPrecio").value;
-      let c = document.getElementById("editProdCategoria").value;
-      
-      if(n && pr && c) { 
-        menu[index] = {nombre: n, precio: parseFloat(pr), categoria: c}; 
-        guardar(); 
-        gestionarProductos(); 
-      } else {
-        alert("Por favor completa todos los campos.");
-      }
-    }
-
-    function borrarProducto(index) {
-      if(confirm("¿Seguro que deseas eliminar este producto?")) {
-        menu.splice(index, 1);
-        guardar();
-        gestionarProductos();
-      }
-    }
-
-    // ----------------------------------------------
-
-    chequearAcceso();
   </script> 
 </body> 
 </html>
